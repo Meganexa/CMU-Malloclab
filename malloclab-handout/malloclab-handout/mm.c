@@ -53,6 +53,25 @@ static void *coalesce(void *bp) {
   size_t prev_state = GET_STATE(FTR(PRVBL(bp)));
   size_t next_state = GET_STATE(HDR(NXTBL(bp)));
   size_t size = GET_SIZE(HDR(bp));
+
+  if (prev_state && next_state) {
+    return bp;
+  } else if (prev_state && !next_state) {
+    size += GET_SIZE(HDR(NXTBL(bp)));
+    PUT(HDR(bp), PACK(size, 0));
+    PUT(FTR(bp), PACK(size, 0));
+  } else if (!prev_state && next_state) {
+    size += GET_SIZE(HDR(PRVBL(bp)));
+    PUT(FTR(bp), PACK(size, 0));
+    PUT(HDR(PRVBL(bp)), PACK(size, 0));
+    bp = PRVBL(bp);
+  } else {
+    size += GET_SIZE(bp - DSIZE) + GET_SIZE(HDR(NXTBL(bp)));
+    PUT(HDR(PRVBL(bp)), PACK(size, 0));
+    PUT(FTR(NXTBL(bp)), PACK(size, 0));
+    bp = PRVBL(bp);
+  }
+  return bp;
 }
 static void *extend_heap(size_t word) {
   char *bp;
@@ -85,6 +104,8 @@ int mm_init(void) {
     return -1;
   return 0;
 }
+
+static void *find_fit(size_t size) {}
 
 /*
  * mm_malloc - Allocate a block by incrementing the brk pointer.
