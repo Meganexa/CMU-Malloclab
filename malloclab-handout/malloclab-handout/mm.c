@@ -102,21 +102,49 @@ int mm_init(void) {
 
   if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
     return -1;
+  heap_listp += (2 * WSIZE);
   return 0;
 }
 
-static void *find_fit(size_t size) {}
+static void *find_fit(size_t size) {
+  void *bp = heap_listp;
+  size_t *curSize = GET_SIZE(HDR(bp));
+  void *state = GET_STATE(HDR(bp));
+  while (curSize != 0) {
+    if (*curSize >= size && !(*state)) {
+      return bp;
+    } else {
+      *bp = NXTBL(bp);
+    }
+  }
+  return NULL;
+}
 
 /*
  * mm_malloc - Allocate a block by incrementing the brk pointer.
  *     Always allocate a block whose size is a multiple of the alignment.
  */
-void *mm_malloc(size_t size) {}
+void *mm_malloc(size_t size) {
+  size = ALIGN(size);
+  char *bp;
+
+  if (size == 0)
+    return NULL;
+
+  if ((bp = find_fit(size)) != NULL) {
+    PUT(HDR(bp), PACK)
+  }
+}
 
 /*
  * mm_free - Freeing a block does nothing.
  */
-void mm_free(void *ptr) {}
+void mm_free(void *bp) {
+  size_t size = GET_SIZE(HDR(bp));
+  PUT(HDR(bp), PACK(size, 0);
+  PUT(FTR(bp), PACK(size, 0));
+  coalesce(bp);
+}
 
 /*
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
