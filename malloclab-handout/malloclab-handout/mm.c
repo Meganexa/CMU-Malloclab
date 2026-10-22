@@ -108,16 +108,25 @@ int mm_init(void) {
 
 static void *find_fit(size_t size) {
   void *bp = heap_listp;
-  size_t *curSize = GET_SIZE(HDR(bp));
-  void *state = GET_STATE(HDR(bp));
+  size_t curSize = GET_SIZE(HDR(bp));
+  int state = GET_STATE(HDR(bp));
   while (curSize != 0) {
-    if (*curSize >= size && !(*state)) {
+    if (curSize >= size && !(state)) {
       return bp;
     } else {
-      *bp = NXTBL(bp);
+      bp = NXTBL(bp);
+      curSize = GET_SIZE(HDR(bp));
     }
   }
   return NULL;
+}
+
+static void *place(char *bp, size_t size) {
+  size_t extra = GET_SIZE(HDR(bp)) - size;
+  PUT(HDR(bp), PACK(size, 0));
+  PUT(FTR(bp), PACK(size, 0));
+  PUT(HDR(NXTBL(bp)), PACK(extra, 1));
+  PUT(FTR(NXTBL(bp)), PACK(extra, 1));
 }
 
 /*
@@ -126,14 +135,22 @@ static void *find_fit(size_t size) {
  */
 void *mm_malloc(size_t size) {
   size = ALIGN(size);
+  size_t excess;
   char *bp;
 
   if (size == 0)
     return NULL;
 
   if ((bp = find_fit(size)) != NULL) {
-    PUT(HDR(bp), PACK)
+    place(bp, size);
+    return bp;
   }
+
+  excess = MAX(size, CHUNKSIZE);
+  if ((bp = extend_heap(excess / WSIZE)) == NULL)
+    return NULL;
+  place(bp, size);
+  return bp;
 }
 
 /*
@@ -141,7 +158,7 @@ void *mm_malloc(size_t size) {
  */
 void mm_free(void *bp) {
   size_t size = GET_SIZE(HDR(bp));
-  PUT(HDR(bp), PACK(size, 0);
+  PUT(HDR(bp), PACK(size, 0));
   PUT(FTR(bp), PACK(size, 0));
   coalesce(bp);
 }
