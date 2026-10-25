@@ -48,7 +48,19 @@ static char *heap_listp;
 
 #define NXTBL(bp) ((char *)bp + GET_SIZE(HDR(bp)))
 #define PRVBL(bp) ((char *)bp - GET_SIZE((char *)bp - DSIZE))
-
+/*
+ * Team Information
+ */
+team_t team = {/* Team name */
+               "bovik",
+               /* First member's full name */
+               "Harry Bovik",
+               /* First member's email address */
+               "bovik@cs.cmu.edu",
+               /* Second member's full name (leave blank if none) */
+               "",
+               /* Second member's email address (leave blank if none) */
+               ""};
 static void *coalesce(void *bp) {
   size_t prev_state = GET_STATE(FTR(PRVBL(bp)));
   size_t next_state = GET_STATE(HDR(NXTBL(bp)));
@@ -102,7 +114,6 @@ int mm_init(void) {
 
   if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
     return -1;
-  heap_listp += (2 * WSIZE);
   return 0;
 }
 
@@ -115,18 +126,25 @@ static void *find_fit(size_t size) {
       return bp;
     } else {
       bp = NXTBL(bp);
+      state = GET_STATE(HDR(bp));
       curSize = GET_SIZE(HDR(bp));
     }
   }
   return NULL;
 }
 
-static void *place(char *bp, size_t size) {
+static void place(char *bp, size_t size) {
   size_t extra = GET_SIZE(HDR(bp)) - size;
-  PUT(HDR(bp), PACK(size, 0));
-  PUT(FTR(bp), PACK(size, 0));
-  PUT(HDR(NXTBL(bp)), PACK(extra, 1));
-  PUT(FTR(NXTBL(bp)), PACK(extra, 1));
+  if (extra >= (2 * DSIZE)) {
+    PUT(HDR(bp), PACK(size, 1));
+    PUT(FTR(bp), PACK(size, 1));
+    PUT(HDR(NXTBL(bp)), PACK(extra, 0));
+    PUT(FTR(NXTBL(bp)), PACK(extra, 0));
+    coalesce(NXTBL(bp));
+  } else {
+    PUT(HDR(bp), PACK(GET_SIZE(HDR(bp)), 1));
+    PUT(FTR(bp), PACK(GET_SIZE(HDR(bp)), 1));
+  }
 }
 
 /*
@@ -134,12 +152,12 @@ static void *place(char *bp, size_t size) {
  *     Always allocate a block whose size is a multiple of the alignment.
  */
 void *mm_malloc(size_t size) {
-  size = ALIGN(size);
-  size_t excess;
-  char *bp;
-
   if (size == 0)
     return NULL;
+
+  size = ALIGN(size + DSIZE);
+  size_t excess;
+  char *bp;
 
   if ((bp = find_fit(size)) != NULL) {
     place(bp, size);
@@ -162,8 +180,29 @@ void mm_free(void *bp) {
   PUT(FTR(bp), PACK(size, 0));
   coalesce(bp);
 }
-
 /*
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
  */
-void *mm_realloc(void *ptr, size_t size) {}
+void *mm_realloc(void *ptr, size_t size) {
+  if (ptr == NULL)
+    return mm_malloc(size);
+
+  if (size == 0) {
+    mm_free(ptr);
+    return NULL;
+  }
+
+  void *np = mm_malloc(size);
+  if (np == NULL)
+    return NULL;
+
+  size_t old_size = GET_SIZE(HDR(ptr)) - DSIZE;
+  size_t copy = old_size;
+  if (copy > size)
+    copy = size;
+
+  memcpy(np, ptr, copy);
+  mm_free(ptr);
+  return np;
+}
+
