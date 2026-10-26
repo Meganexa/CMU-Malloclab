@@ -27,6 +27,7 @@
 
 //  Private constants
 static char *heap_listp;
+static char *rover;
 //  Macros
 
 #define WSIZE 4
@@ -83,6 +84,7 @@ static void *coalesce(void *bp) {
     PUT(FTR(NXTBL(bp)), PACK(size, 0));
     bp = PRVBL(bp);
   }
+  rover = bp;
   return bp;
 }
 static void *extend_heap(size_t word) {
@@ -111,25 +113,28 @@ int mm_init(void) {
   PUT(heap_listp + 2 * WSIZE, PACK(DSIZE, 1));
   PUT(heap_listp + 3 * WSIZE, PACK(0, 1));
   heap_listp += (2 * WSIZE);
-
+  rover = heap_listp;
   if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
     return -1;
   return 0;
 }
 
 static void *find_fit(size_t size) {
-  void *bp = heap_listp;
-  size_t curSize = GET_SIZE(HDR(bp));
-  int state = GET_STATE(HDR(bp));
-  while (curSize != 0) {
-    if (curSize >= size && !(state)) {
+  void *old_rover = rover;
+  for (void *bp = rover; GET_SIZE(HDR(bp)) > 0; bp = NXTBL(bp)) {
+    if (!GET_STATE(HDR(bp)) && (size <= GET_SIZE(HDR(bp)))) {
+      rover = bp;
       return bp;
-    } else {
-      bp = NXTBL(bp);
-      state = GET_STATE(HDR(bp));
-      curSize = GET_SIZE(HDR(bp));
     }
   }
+
+  for (void *bp = heap_listp; bp != old_rover; bp = NXTBL(bp)) {
+    if (!GET_STATE(HDR(bp)) && (size <= GET_SIZE(HDR(bp)))) {
+      rover = bp;
+      return bp;
+    }
+  }
+
   return NULL;
 }
 
@@ -205,4 +210,3 @@ void *mm_realloc(void *ptr, size_t size) {
   mm_free(ptr);
   return np;
 }
-
